@@ -1,0 +1,96 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: #0f172a;
+  color: #e2e8f0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+@layer components {
+  .card {
+    @apply bg-surface-800/60 backdrop-blur-sm border border-surface-700/50 rounded-2xl p-6;
+  }
+
+  .card-hover {
+    @apply card transition-all duration-300 hover:border-accent/30 hover:shadow-lg hover:shadow-accent-glow;
+  }
+
+  .glow-border {
+    @apply border border-accent/20 shadow-lg shadow-accent-glow;
+  }
+
+  .metric-value {
+    @apply text-3xl font-bold tracking-tight;
+  }
+
+  .section-title {
+    @apply text-lg font-semibold text-surface-100 mb-4;
+  }
+
+  .badge {
+    @apply px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-success {
+    @apply badge bg-success/15 text-success;
+  }
+
+  .badge-warning {
+    @apply badge bg-warning/15 text-warning;
+  }
+
+  .badge-danger {
+    @apply badge bg-danger/15 text-danger;
+  }
+
+  .badge-accent {
+    @apply badge bg-accent/15 text-accent-light;
+  }
+
+  .btn-primary {
+    @apply px-4 py-2 bg-accent hover:bg-accent-dark text-white font-medium rounded-xl transition-all duration-200 active:scale-[0.97];
+  }
+
+  .btn-ghost {
+    @apply px-4 py-2 text-surface-300 hover:text-white hover:bg-surface-700/50 font-medium rounded-xl transition-all duration-200;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-2.5 bg-surface-900/60 border border-surface-600/50 rounded-xl text-surface-100 placeholder-surface-500 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/30 transition-all duration-200;
+  }
+
+  .progress-bar {
+    @apply w-full h-2.5 bg-surface-700/50 rounded-full overflow-hidden;
+  }
+
+  .progress-fill {
+    @apply h-full rounded-full transition-all duration-700 ease-out;
+  }
+}
