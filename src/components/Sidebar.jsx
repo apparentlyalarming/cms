@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   LayoutDashboard, GraduationCap, BookOpen, Calendar, CreditCard,
   Building2, CalendarDays, Megaphone, Brain, MessageCircle,
-  ChevronLeft, ChevronRight, Sparkles, LogOut
+  ChevronLeft, ChevronRight, Sparkles,
 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 const navItems = [
   { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -16,7 +17,19 @@ const navItems = [
   { id: 'performance', icon: Brain, label: 'AI Performance' },
 ];
 
-export default function Sidebar({ activeSection, onNavigate, role, collapsed, onToggleCollapse, onChatToggle }) {
+export default function Sidebar({ activeSection, onNavigate, role, user, collapsed, onToggleCollapse, onChatToggle }) {
+  const [profile, setProfile] = useState(null);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase.from('profiles').select('full_name, email').eq('id', user.id).single()
+      .then(({ data }) => setProfile(data));
+  }, [user]);
+
+  const displayName = profile?.full_name || profile?.email?.split('@')[0] || 'User';
+  const initials = displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+  const displayId = role === 'student' ? '' : '';
+
   return (
     <aside
       className={`fixed left-0 top-0 h-full z-40 bg-surface-900/95 backdrop-blur-xl border-r border-surface-700/50 transition-all duration-300 flex flex-col ${
@@ -82,16 +95,12 @@ export default function Sidebar({ activeSection, onNavigate, role, collapsed, on
         </button>
         <div className={`flex items-center gap-3 px-3 py-2.5 rounded-xl bg-surface-800/50 ${collapsed ? 'justify-center' : ''}`}>
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent to-purple-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-            {role === 'student' ? 'AM' : 'PS'}
+            {initials}
           </div>
           {!collapsed && (
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">
-                {role === 'student' ? 'Arjun Mehta' : 'Dr. Priya Sharma'}
-              </p>
-              <p className="text-xs text-surface-500 truncate">
-                {role === 'student' ? 'CS2024001' : 'FAC2019042'}
-              </p>
+              <p className="text-sm font-medium text-white truncate">{displayName}</p>
+              <p className="text-xs text-surface-500 capitalize">{role}</p>
             </div>
           )}
         </div>

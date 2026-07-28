@@ -2,7 +2,7 @@ import { Bell, LogOut } from 'lucide-react';
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 
-export default function Header({ role, onRoleToggle, pageTitle, onLogout }) {
+export default function Header({ role, pageTitle, onLogout }) {
   const [showNotif, setShowNotif] = useState(false);
 
   return (
@@ -13,19 +13,6 @@ export default function Header({ role, onRoleToggle, pageTitle, onLogout }) {
         </div>
 
         <div className="flex items-center gap-3">
-          <button
-            onClick={onRoleToggle}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-800/60 border border-surface-700/50 hover:border-accent/30 transition-all duration-200 group"
-          >
-            <div className={`w-2 h-2 rounded-full transition-colors ${role === 'student' ? 'bg-accent' : 'bg-purple-400'}`} />
-            <span className="text-sm font-medium text-surface-300 group-hover:text-white transition-colors">
-              {role === 'student' ? 'Student Dashboard' : 'Faculty Dashboard'}
-            </span>
-            <div className="px-2 py-0.5 rounded-md bg-accent/10 text-accent text-xs font-semibold">
-              {role === 'student' ? 'S' : 'F'}
-            </div>
-          </button>
-
           <div className="relative">
             <button
               onClick={() => setShowNotif(!showNotif)}

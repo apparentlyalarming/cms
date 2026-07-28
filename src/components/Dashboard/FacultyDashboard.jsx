@@ -1,32 +1,80 @@
+import { useState, useEffect } from 'react';
 import { Users, BookOpen, ClipboardCheck, TrendingUp, Clock, AlertTriangle } from 'lucide-react';
-import { facultyData } from '../../data';
+import { supabase } from '../../lib/supabase';
+import LoadingState from '../ui/LoadingState';
+import ErrorState from '../ui/ErrorState';
 
-const metrics = [
-  { label: 'Students Under You', value: facultyData.totalStudents, icon: Users, color: 'from-accent to-purple-500' },
-  { label: 'Courses Teaching', value: facultyData.coursesTeaching, icon: BookOpen, color: 'from-amber-500 to-orange-500' },
-  { label: 'Avg Class Attendance', value: '86%', icon: ClipboardCheck, color: 'from-success to-emerald-500' },
-  { label: 'Pending Evaluations', value: 12, icon: TrendingUp, color: 'from-rose-500 to-pink-500' },
-];
+export default function FacultyDashboard({ user, onNavigate }) {
+  const [profile, setProfile] = useState(null);
+  const [facultyRec, setFacultyRec] = useState(null);
+  const [stats, setStats] = useState({ totalStudents: 0, coursesTeaching: 0, avgAttendance: 0, pendingEvals: 0 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-const todaySchedule = [
-  { time: '09:00 - 09:50', subject: 'Data Structures', section: 'CS-A', room: 'A-301', type: 'Lecture' },
-  { time: '10:00 - 10:50', subject: 'Data Structures', section: 'CS-B', room: 'A-301', type: 'Lecture' },
-  { time: '11:00 - 11:50', subject: 'OS Tutorial', section: 'CS-A', room: 'C-103', type: 'Tutorial' },
-  { time: '14:00 - 14:50', subject: 'Data Structures Lab', section: 'CS-A', room: 'C-102', type: 'Lab' },
-];
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
 
-const alerts = [
-  { text: '3 students below 75% attendance in CS301', severity: 'high', icon: AlertTriangle },
-  { text: 'CS303 assignment deadline extended to Aug 3', severity: 'medium', icon: Clock },
-  { text: 'Placement coordination meeting at 4 PM', severity: 'low', icon: Clock },
-];
+    async function load() {
+      try {
+        const [profileRes, facultyRes] = await Promise.all([
+          supabase.from('profiles').select('*').eq('id', user.id).single(),
+          supabase.from('faculty').select('*').eq('faculty_id', user.id).single(),
+        ]);
 
-export default function FacultyDashboard({ onNavigate }) {
+        if (cancelled) return;
+        setProfile(profileRes.data);
+        setFacultyRec(facultyRes.data);
+
+        const { count: studentCount } = await supabase
+          .from('students').select('*', { count: 'exact', head: true });
+
+        const { count: courseCount } = await supabase
+          .from('courses').select('*', { count: 'exact', head: true })
+          .eq('department', facultyRes.data?.department || 'Computer Science');
+
+        if (!cancelled) {
+          setStats({
+            totalStudents: studentCount || 0,
+            coursesTeaching: courseCount || 0,
+            avgAttendance: 86,
+            pendingEvals: 12,
+          });
+        }
+      } catch (err) {
+        if (!cancelled) setError(err.message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    load();
+    return () => { cancelled = true; };
+  }, [user]);
+
+  if (loading) return <LoadingState message="Loading dashboard..." />;
+  if (error) return <ErrorState message={error} />;
+
+  const name = profile?.full_name?.split(' ').slice(1).join(' ') || 'Professor';
+  const metrics = [
+    { label: 'Students Under You', value: stats.totalStudents, icon: Users, color: 'from-accent to-purple-500' },
+    { label: 'Courses Teaching', value: stats.coursesTeaching, icon: BookOpen, color: 'from-amber-500 to-orange-500' },
+    { label: 'Avg Class Attendance', value: `${stats.avgAttendance}%`, icon: ClipboardCheck, color: 'from-success to-emerald-500' },
+    { label: 'Pending Evaluations', value: stats.pendingEvals, icon: TrendingUp, color: 'from-rose-500 to-pink-500' },
+  ];
+
+  const alerts = [
+    { text: 'Students below 75% attendance flagged', severity: 'high', icon: AlertTriangle },
+    { text: 'Placement coordination meeting at 4 PM', severity: 'low', icon: Clock },
+  ];
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
-        <h2 className="text-2xl font-bold text-white">Good morning, {facultyData.name.split(' ').slice(1).join(' ')} 🎓</h2>
-        <p className="text-surface-400 mt-1">{facultyData.designation} • {facultyData.department} • ID: {facultyData.employeeId}</p>
+        <h2 className="text-2xl font-bold text-white">Good morning, {name} 🎓</h2>
+        <p className="text-surface-400 mt-1">
+          {facultyRec?.designation || 'Faculty'} • {facultyRec?.department || profile?.email} • ID: {facultyRec?.employee_id || '—'}
+        </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -50,69 +98,36 @@ export default function FacultyDashboard({ onNavigate }) {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 card animate-slide-up" style={{ animationDelay: '320ms' }}>
-          <h3 className="section-title">Today's Schedule</h3>
+          <h3 className="section-title">Alerts & Reminders</h3>
           <div className="space-y-3">
-            {todaySchedule.map((s, i) => (
-              <div key={i} className="flex items-center gap-4 p-3 rounded-xl bg-surface-700/30 hover:bg-surface-700/50 transition-colors">
-                <div className="w-24 flex-shrink-0">
-                  <p className="text-xs text-surface-500">{s.time.split(' - ')[0]}</p>
-                  <p className="text-xs text-surface-500">{s.time.split(' - ')[1]}</p>
+            {alerts.map((a, i) => {
+              const Icon = a.icon;
+              return (
+                <div key={i} className="flex items-start gap-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                    a.severity === 'high' ? 'bg-danger/15' : 'bg-surface-700/50'
+                  }`}>
+                    <Icon className={`w-4 h-4 ${a.severity === 'high' ? 'text-danger' : 'text-surface-400'}`} />
+                  </div>
+                  <p className="text-sm text-surface-200">{a.text}</p>
                 </div>
-                <div className="w-px h-8 bg-surface-600/50" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-white">{s.subject}</p>
-                  <p className="text-xs text-surface-400">{s.section} • {s.room}</p>
-                </div>
-                <span className={`badge ${
-                  s.type === 'Lecture' ? 'badge-accent' :
-                  s.type === 'Lab' ? 'badge-warning' : 'badge-success'
-                }`}>
-                  {s.type}
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div className="card animate-slide-up" style={{ animationDelay: '400ms' }}>
-            <h3 className="section-title">Alerts & Reminders</h3>
-            <div className="space-y-3">
-              {alerts.map((a, i) => {
-                const Icon = a.icon;
-                return (
-                  <div key={i} className="flex items-start gap-3">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                      a.severity === 'high' ? 'bg-danger/15' : a.severity === 'medium' ? 'bg-warning/15' : 'bg-surface-700/50'
-                    }`}>
-                      <Icon className={`w-4 h-4 ${
-                        a.severity === 'high' ? 'text-danger' : a.severity === 'medium' ? 'text-warning' : 'text-surface-400'
-                      }`} />
-                    </div>
-                    <p className="text-sm text-surface-200">{a.text}</p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="card animate-slide-up" style={{ animationDelay: '480ms' }}>
-            <h3 className="section-title">Quick Actions</h3>
-            <div className="space-y-2">
-              {[
-                { label: 'Mark Attendance', action: () => onNavigate('attendance') },
-                { label: 'View Performance Analytics', action: () => onNavigate('performance') },
-                { label: 'Post Circular', action: () => onNavigate('circulars') },
-              ].map((q, i) => (
-                <button
-                  key={i}
-                  onClick={q.action}
-                  className="w-full text-left px-3 py-2.5 rounded-xl text-sm text-surface-300 hover:text-white hover:bg-surface-700/40 transition-all"
-                >
-                  {q.label} →
-                </button>
-              ))}
-            </div>
+        <div className="card animate-slide-up" style={{ animationDelay: '400ms' }}>
+          <h3 className="section-title">Quick Actions</h3>
+          <div className="space-y-2">
+            {[
+              { label: 'Mark Attendance', action: () => onNavigate('attendance') },
+              { label: 'View Performance Analytics', action: () => onNavigate('performance') },
+              { label: 'Post Circular', action: () => onNavigate('circulars') },
+            ].map((q, i) => (
+              <button key={i} onClick={q.action} className="w-full text-left px-3 py-2.5 rounded-xl text-sm text-surface-300 hover:text-white hover:bg-surface-700/40 transition-all">
+                {q.label} →
+              </button>
+            ))}
           </div>
         </div>
       </div>

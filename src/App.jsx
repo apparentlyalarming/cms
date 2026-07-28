@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { supabase } from './lib/supabase';
 import Login from './components/Auth/Login';
+import Signup from './components/Auth/Signup';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import StudentDashboard from './components/Dashboard/StudentDashboard';
@@ -27,6 +29,7 @@ const sectionTitles = {
 export default function App() {
   const [authUser, setAuthUser] = useState(null);
   const [role, setRole] = useState(null);
+  const [authPage, setAuthPage] = useState('login');
   const [activeSection, setActiveSection] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
@@ -45,37 +48,54 @@ export default function App() {
     setChatOpen(false);
   };
 
-  const toggleRole = () => {
-    setRole(prev => prev === 'student' ? 'faculty' : 'student');
-    setActiveSection('dashboard');
-  };
+  useEffect(() => {
+    if (!authUser) return;
+    supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', authUser.id)
+      .single()
+      .then(({ data, error }) => {
+        if (error || !data?.role) {
+          const metaRole = authUser.user_metadata?.role;
+          if (metaRole) setRole(metaRole);
+          return;
+        }
+        setRole(data.role);
+      });
+  }, [authUser]);
 
   if (!authUser) {
-    return <Login onLogin={handleLogin} />;
+    if (authPage === 'signup') {
+      return <Signup onSignup={handleLogin} onSwitchToLogin={() => setAuthPage('login')} />;
+    }
+    return <Login onLogin={handleLogin} onSwitchToSignup={() => setAuthPage('signup')} />;
   }
+
+  const user = authUser;
 
   const renderSection = () => {
     switch (activeSection) {
       case 'dashboard':
         return role === 'student'
-          ? <StudentDashboard onNavigate={setActiveSection} />
-          : <FacultyDashboard onNavigate={setActiveSection} />;
+          ? <StudentDashboard user={user} onNavigate={setActiveSection} />
+          : <FacultyDashboard user={user} onNavigate={setActiveSection} />;
       case 'attendance':
-        return <AttendanceTracker />;
+        return <AttendanceTracker user={user} />;
       case 'timetable':
-        return <Timetable />;
+        return <Timetable user={user} />;
       case 'fees':
-        return <FeeStatus />;
+        return <FeeStatus user={user} />;
       case 'hostel':
-        return <HostelManagement />;
+        return <HostelManagement user={user} />;
       case 'events':
-        return <EventRegistration />;
+        return <EventRegistration user={user} />;
       case 'circulars':
         return <Circulars />;
       case 'performance':
-        return <PerformancePredictor />;
+        return <PerformancePredictor user={user} />;
       default:
-        return <StudentDashboard onNavigate={setActiveSection} />;
+        return <StudentDashboard user={user} onNavigate={setActiveSection} />;
     }
   };
 
@@ -85,6 +105,7 @@ export default function App() {
         activeSection={activeSection}
         onNavigate={setActiveSection}
         role={role}
+        user={user}
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         onChatToggle={() => setChatOpen(!chatOpen)}
@@ -96,7 +117,6 @@ export default function App() {
       >
         <Header
           role={role}
-          onRoleToggle={toggleRole}
           pageTitle={sectionTitles[activeSection]}
           onLogout={handleLogout}
         />

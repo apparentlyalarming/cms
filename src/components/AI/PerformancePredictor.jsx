@@ -1,6 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Brain, TrendingUp, TrendingDown, Target, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
-import { performanceData } from '../../data';
+import { supabase } from '../../lib/supabase';
+import LoadingState from '../ui/LoadingState';
+import ErrorState from '../ui/ErrorState';
 
 const gradeScale = [
   { min: 90, grade: 'A+', color: 'text-success' },
@@ -13,35 +15,79 @@ const gradeScale = [
 ];
 
 function getGrade(score) {
-  return gradeScale.find(g => score >= g.min);
+  return gradeScale.find(g => score >= g.min) || gradeScale[gradeScale.length - 1];
 }
 
-function predictGrade(quizAvg, assignmentAvg, midsem) {
-  const predicted = quizAvg * 0.25 + assignmentAvg * 0.35 + midsem * 0.40;
-  return predicted;
-}
-
-export default function PerformancePredictor() {
-  const [expandedSubject, setExpandedSubject] = useState(null);
+export default function PerformancePredictor({ user }) {
+  const [subjects, setSubjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [expandedIdx, setExpandedIdx] = useState(null);
   const [futureScores, setFutureScores] = useState({});
 
-  const subjectAnalytics = useMemo(() => {
-    return performanceData.subjects.map((s, idx) => {
-      const quizAvg = s.quizzes.reduce((a, b) => a + b, 0) / s.quizzes.length;
-      const assignmentAvg = s.assignments.reduce((a, b) => a + b, 0) / s.assignments.length;
-      const currentScore = predictGrade(quizAvg, assignmentAvg, s.midsem);
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const { data: enrollments } = await supabase
+          .from('enrollments')
+          .select('enrollment_id, course:courses(course_name)')
+          .eq('student_id', user.id)
+          .eq('status', 'enrolled');
+
+        if (cancelled || !enrollments) return;
+
+        const results = await Promise.all(
+          enrollments.map(async (en) => {
+            const { data: perfRows } = await supabase
+              .from('performance')
+              .select('assessment_type, score')
+              .eq('enrollment_id', en.enrollment_id);
+
+            const quizzes = (perfRows || []).filter(p => p.assessment_type === 'quiz').map(p => Number(p.score));
+            const assignments = (perfRows || []).filter(p => p.assessment_type === 'assignment').map(p => Number(p.score));
+            const midsemRow = perfRows?.find(p => p.assessment_type === 'midsem');
+
+            return {
+              name: en.course?.course_name || 'Unknown',
+              quizzes,
+              assignments,
+              midsem: midsemRow?.score || 0,
+            };
+          })
+        );
+
+        if (!cancelled) setSubjects(results);
+      } catch (err) {
+        if (!cancelled) setError(err.message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    load();
+    return () => { cancelled = true; };
+  }, [user]);
+
+  const analytics = useMemo(() => {
+    return subjects.map((s, idx) => {
+      const quizAvg = s.quizzes.length > 0 ? s.quizzes.reduce((a, b) => a + b, 0) / s.quizzes.length : 0;
+      const assignmentAvg = s.assignments.length > 0 ? s.assignments.reduce((a, b) => a + b, 0) / s.assignments.length : 0;
+      const currentScore = quizAvg * 0.25 + assignmentAvg * 0.35 + s.midsem * 0.40;
       const currentGrade = getGrade(currentScore);
 
-      const future = futureScores[idx] || { endsem: 80 };
-      const futureScore = predictGrade(
-        (quizAvg * s.quizzes.length + (future.quiz || quizAvg)) / (s.quizzes.length + 1),
-        (assignmentAvg * s.assignments.length + (future.assignment || assignmentAvg)) / (s.assignments.length + 1),
-        future.midsem || s.midsem
-      );
+      const future = futureScores[idx] || {};
+      const futureQuizAvg = future.quiz != null
+        ? (quizAvg * s.quizzes.length + future.quiz) / (s.quizzes.length + 1)
+        : quizAvg;
+      const futureAssignmentAvg = future.assignment != null
+        ? (assignmentAvg * s.assignments.length + future.assignment) / (s.assignments.length + 1)
+        : assignmentAvg;
+      const futureMidsem = future.midsem != null ? future.midsem : s.midsem;
+      const futureScore = futureQuizAvg * 0.25 + futureAssignmentAvg * 0.35 + futureMidsem * 0.40;
       const futureGrade = getGrade(futureScore);
-
-      const endsemPredicted = (futureScore - (quizAvg * 0.25 + assignmentAvg * 0.35)) / 0.40;
-      const targetEndsem = Math.max(0, Math.min(100, (75 - quizAvg * 0.25 - assignmentAvg * 0.35) / 0.40));
 
       return {
         name: s.name,
@@ -52,22 +98,24 @@ export default function PerformancePredictor() {
         currentGrade,
         futureScore: futureScore.toFixed(1),
         futureGrade,
-        endsemPredicted: Math.round(endsemPredicted),
-        targetEndsem: Math.round(targetEndsem),
         trend: futureScore > currentScore ? 'up' : futureScore < currentScore ? 'down' : 'same',
       };
     });
-  }, [futureScores]);
+  }, [subjects, futureScores]);
 
   const overallGPA = useMemo(() => {
-    const total = subjectAnalytics.reduce((sum, s) => sum + parseFloat(s.futureScore), 0) / subjectAnalytics.length;
-    return (total / 10).toFixed(2);
-  }, [subjectAnalytics]);
+    if (analytics.length === 0) return '0.00';
+    const avg = analytics.reduce((sum, s) => sum + parseFloat(s.futureScore), 0) / analytics.length;
+    return (avg / 10).toFixed(2);
+  }, [analytics]);
+
+  if (loading) return <LoadingState message="Loading performance data..." />;
+  if (error) return <ErrorState message={error} />;
 
   const updateFuture = (idx, key, value) => {
     setFutureScores(prev => ({
       ...prev,
-      [idx]: { ...prev[idx], [key]: parseInt(value) || 0 },
+      [idx]: { ...prev[idx], [key]: value === '' ? null : parseInt(value) || 0 },
     }));
   };
 
@@ -92,114 +140,89 @@ export default function PerformancePredictor() {
           </div>
           <div className="text-right">
             <p className="text-surface-400 text-sm">Average Score</p>
-            <p className={`text-xl font-bold mt-1 ${
-              parseFloat(overallGPA) >= 8 ? 'text-success' :
-              parseFloat(overallGPA) >= 6 ? 'text-accent-light' : 'text-warning'
-            }`}>
-              {((parseFloat(overallGPA)) * 10).toFixed(1)}%
+            <p className={`text-xl font-bold mt-1 ${parseFloat(overallGPA) >= 8 ? 'text-success' : parseFloat(overallGPA) >= 6 ? 'text-accent-light' : 'text-warning'}`}>
+              {(parseFloat(overallGPA) * 10).toFixed(1)}%
             </p>
           </div>
         </div>
       </div>
 
-      <div className="space-y-3">
-        {subjectAnalytics.map((s, i) => {
-          const isExpanded = expandedSubject === i;
-          return (
-            <div
-              key={i}
-              className="card animate-slide-up"
-              style={{ animationDelay: `${i * 60}ms` }}
-            >
-              <button
-                onClick={() => setExpandedSubject(isExpanded ? null : i)}
-                className="w-full text-left"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
+      {analytics.length === 0 ? (
+        <p className="text-sm text-surface-500 text-center py-10">No performance data found. Enroll in courses first.</p>
+      ) : (
+        <div className="space-y-3">
+          {analytics.map((s, i) => {
+            const isExpanded = expandedIdx === i;
+            return (
+              <div key={i} className="card animate-slide-up" style={{ animationDelay: `${i * 60}ms` }}>
+                <button onClick={() => setExpandedIdx(isExpanded ? null : i)} className="w-full text-left">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
                       <h4 className="text-sm font-semibold text-white">{s.name}</h4>
                       {s.trend === 'up' && <TrendingUp className="w-4 h-4 text-success" />}
                       {s.trend === 'down' && <TrendingDown className="w-4 h-4 text-danger" />}
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-surface-500">Current: <span className={`font-semibold ${s.currentGrade.color}`}>{s.currentGrade.grade}</span> ({s.currentScore}%)</span>
+                        <span className="text-xs text-surface-600">→</span>
+                        <span className="text-xs text-surface-500">Predicted: <span className={`font-semibold ${s.futureGrade.color}`}>{s.futureGrade.grade}</span> ({s.futureScore}%)</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-surface-500">Current: <span className={`font-semibold ${s.currentGrade.color}`}>{s.currentGrade.grade}</span> ({s.currentScore}%)</span>
-                      <span className="text-xs text-surface-600">→</span>
-                      <span className="text-xs text-surface-500">Predicted: <span className={`font-semibold ${s.futureGrade.color}`}>{s.futureGrade.grade}</span> ({s.futureScore}%)</span>
-                    </div>
+                    {isExpanded ? <ChevronUp className="w-4 h-4 text-surface-500" /> : <ChevronDown className="w-4 h-4 text-surface-500" />}
                   </div>
-                  {isExpanded ? <ChevronUp className="w-4 h-4 text-surface-500" /> : <ChevronDown className="w-4 h-4 text-surface-500" />}
-                </div>
-              </button>
+                </button>
 
-              {isExpanded && (
-                <div className="mt-4 pt-4 border-t border-surface-700/30 animate-fade-in">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <h5 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Current Performance</h5>
-                      <div className="space-y-2">
-                        {[
-                          { label: 'Quiz Average', value: `${s.quizAvg}%` },
-                          { label: 'Assignment Average', value: `${s.assignmentAvg}%` },
-                          { label: 'Mid-Semester', value: `${s.midsem}%` },
-                        ].map((m, j) => (
-                          <div key={j} className="flex justify-between text-sm">
-                            <span className="text-surface-400">{m.label}</span>
-                            <span className="text-white font-medium">{m.value}</span>
+                {isExpanded && (
+                  <div className="mt-4 pt-4 border-t border-surface-700/30 animate-fade-in">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <h5 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Current Performance</h5>
+                        <div className="space-y-2">
+                          {[
+                            { label: 'Quiz Average', value: `${s.quizAvg}%` },
+                            { label: 'Assignment Average', value: `${s.assignmentAvg}%` },
+                            { label: 'Mid-Semester', value: `${s.midsem}%` },
+                          ].map((m, j) => (
+                            <div key={j} className="flex justify-between text-sm">
+                              <span className="text-surface-400">{m.label}</span>
+                              <span className="text-white font-medium">{m.value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <h5 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Predict Your Future Score</h5>
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs text-surface-500 mb-1">Expected Next Quiz (%)</label>
+                            <input type="number" min="0" max="100" value={futureScores[i]?.quiz ?? ''} onChange={(e) => updateFuture(i, 'quiz', e.target.value)} className="input-field text-sm" placeholder={`Current avg: ${s.quizAvg}`} />
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <h5 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Predict Your Future Score</h5>
-                      <div className="space-y-3">
-                        <div>
-                          <label className="block text-xs text-surface-500 mb-1">Expected Next Quiz (%)</label>
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={futureScores[i]?.quiz || ''}
-                            onChange={(e) => updateFuture(i, 'quiz', e.target.value)}
-                            className="input-field text-sm"
-                            placeholder={`Current avg: ${s.quizAvg}`}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs text-surface-500 mb-1">Expected End-Sem (%)</label>
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={futureScores[i]?.endsem || ''}
-                            onChange={(e) => updateFuture(i, 'endsem', e.target.value)}
-                            className="input-field text-sm"
-                            placeholder="Enter expected end-sem score"
-                          />
+                          <div>
+                            <label className="block text-xs text-surface-500 mb-1">Expected Mid-Sem (%)</label>
+                            <input type="number" min="0" max="100" value={futureScores[i]?.midsem ?? ''} onChange={(e) => updateFuture(i, 'midsem', e.target.value)} className="input-field text-sm" placeholder={`Current: ${s.midsem}`} />
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-
-                  <div className="mt-4 p-3 rounded-xl bg-surface-900/40 border border-surface-700/30">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Target className="w-4 h-4 text-accent-light" />
-                      <span className="text-xs font-semibold text-surface-300">AI Insight</span>
+                    <div className="mt-4 p-3 rounded-xl bg-surface-900/40 border border-surface-700/30">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Target className="w-4 h-4 text-accent-light" />
+                        <span className="text-xs font-semibold text-surface-300">AI Insight</span>
+                      </div>
+                      <p className="text-sm text-surface-400">
+                        {parseFloat(s.futureScore) >= 80
+                          ? `You're on track for a strong ${s.futureGrade.grade}. Keep this momentum!`
+                          : parseFloat(s.futureScore) >= 60
+                          ? `A solid ${s.futureGrade.grade} is within reach. Focus on end-semester preparation.`
+                          : `To reach a B grade, aim for higher scores in upcoming assessments.`}
+                      </p>
                     </div>
-                    <p className="text-sm text-surface-400">
-                      {parseFloat(s.futureScore) >= 80
-                        ? `You're on track for a strong ${s.futureGrade.grade}. Keep this momentum!`
-                        : parseFloat(s.futureScore) >= 60
-                        ? `A solid ${s.futureGrade.grade} is within reach. Focus on end-semester preparation.`
-                        : `To reach a B grade, aim for at least ${s.targetEndsem}% in end-sem examinations.`}
-                    </p>
                   </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

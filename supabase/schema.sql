@@ -234,12 +234,18 @@ CREATE POLICY "Faculty can read all students"
 CREATE POLICY "Students can update own record"
   ON students FOR UPDATE USING (auth.uid() = student_id);
 
+CREATE POLICY "Students can insert own record"
+  ON students FOR INSERT WITH CHECK (auth.uid() = student_id);
+
 -- 3c. faculty
 CREATE POLICY "Faculty can read own record"
   ON faculty FOR SELECT USING (auth.uid() = faculty_id);
 
 CREATE POLICY "Students can read faculty list"
   ON faculty FOR SELECT USING (true);
+
+CREATE POLICY "Faculty can insert own record"
+  ON faculty FOR INSERT WITH CHECK (auth.uid() = faculty_id);
 
 -- 3d. courses — readable by everyone, write by faculty
 CREATE POLICY "Anyone can read courses"

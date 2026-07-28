@@ -3,7 +3,7 @@ import { Mail, Lock, Eye, EyeOff, LogIn, AlertCircle, GraduationCap, Loader2, Ar
 import { supabase } from '../../lib/supabase';
 import ForgotPasswordModal from './ForgotPasswordModal';
 
-export default function Login({ onLogin }) {
+export default function Login({ onLogin, onSwitchToSignup }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -177,6 +177,16 @@ export default function Login({ onLogin }) {
 
         <p className="text-center text-xs text-surface-600 mt-6">
           Smart Campus Management Portal &middot; Secure Authentication via Supabase
+        </p>
+
+        <p className="text-center text-sm text-surface-400 mt-4">
+          Don&apos;t have an account?{' '}
+          <button
+            onClick={onSwitchToSignup}
+            className="text-accent-light hover:text-accent font-medium transition-colors"
+          >
+            Sign up
+          </button>
         </p>
       </div>
 
