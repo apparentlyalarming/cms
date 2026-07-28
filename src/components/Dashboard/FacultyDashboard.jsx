@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, BookOpen, ClipboardCheck, TrendingUp, Clock, AlertTriangle } from 'lucide-react';
+import { Users, BookOpen, ClipboardCheck, TrendingUp, Clock, AlertTriangle, Megaphone, CalendarDays } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import LoadingState from '../ui/LoadingState';
 import ErrorState from '../ui/ErrorState';
@@ -8,6 +8,8 @@ export default function FacultyDashboard({ user, onNavigate }) {
   const [profile, setProfile] = useState(null);
   const [facultyRec, setFacultyRec] = useState(null);
   const [stats, setStats] = useState({ totalStudents: 0, coursesTeaching: 0, avgAttendance: 0, pendingEvals: 0 });
+  const [recentEvents, setRecentEvents] = useState([]);
+  const [recentCirculars, setRecentCirculars] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -40,6 +42,15 @@ export default function FacultyDashboard({ user, onNavigate }) {
             avgAttendance: 86,
             pendingEvals: 12,
           });
+        }
+
+        const [evtRes, circRes] = await Promise.all([
+          supabase.from('events').select('title, event_date, category, venue').order('event_date').limit(3),
+          supabase.from('circulars').select('title, priority, created_at').order('created_at', { ascending: false }).limit(4),
+        ]);
+        if (!cancelled) {
+          setRecentEvents(evtRes.data || []);
+          setRecentCirculars(circRes.data || []);
         }
       } catch (err) {
         if (!cancelled) setError(err.message);
@@ -121,6 +132,7 @@ export default function FacultyDashboard({ user, onNavigate }) {
           <div className="space-y-2">
             {[
               { label: 'Mark Attendance', action: () => onNavigate('attendance') },
+              { label: 'Manage Timetable', action: () => onNavigate('timetable') },
               { label: 'View Performance Analytics', action: () => onNavigate('performance') },
               { label: 'Post Circular', action: () => onNavigate('circulars') },
             ].map((q, i) => (
@@ -129,6 +141,63 @@ export default function FacultyDashboard({ user, onNavigate }) {
               </button>
             ))}
           </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="card animate-slide-up">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="section-title mb-0">
+              <span className="flex items-center gap-2"><CalendarDays className="w-4 h-4 text-accent-light" /> Upcoming Events</span>
+            </h3>
+            <button onClick={() => onNavigate('events')} className="text-xs text-accent-light hover:text-accent font-medium">View all →</button>
+          </div>
+          {recentEvents.length === 0 ? (
+            <p className="text-sm text-surface-500">No upcoming events.</p>
+          ) : (
+            <div className="space-y-2">
+              {recentEvents.map((ev, i) => (
+                <div key={i} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-surface-700/30 transition-colors">
+                  <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
+                    <CalendarDays className="w-5 h-5 text-accent-light" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-surface-200 truncate">{ev.title}</p>
+                    <p className="text-xs text-surface-500">{ev.event_date} · {ev.venue || ev.category}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="card animate-slide-up">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="section-title mb-0">
+              <span className="flex items-center gap-2"><Megaphone className="w-4 h-4 text-accent-light" /> Recent Circulars</span>
+            </h3>
+            <button onClick={() => onNavigate('circulars')} className="text-xs text-accent-light hover:text-accent font-medium">View all →</button>
+          </div>
+          {recentCirculars.length === 0 ? (
+            <p className="text-sm text-surface-500">No circulars yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {recentCirculars.map((c, i) => (
+                <div key={i} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-surface-700/30 transition-colors">
+                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                    c.priority === 'high' ? 'bg-danger' : c.priority === 'medium' ? 'bg-warning' : 'bg-surface-500'
+                  }`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-surface-200 truncate">{c.title}</p>
+                    <p className="text-xs text-surface-500">{new Date(c.created_at).toLocaleDateString()}</p>
+                  </div>
+                  <span className={`badge text-[10px] ${
+                    c.priority === 'high' ? 'badge-danger' : c.priority === 'medium' ? 'badge-warning' : 'badge-accent'
+                  }`}>{c.priority}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

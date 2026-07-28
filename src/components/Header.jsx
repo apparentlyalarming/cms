@@ -1,9 +1,28 @@
-import { Bell, LogOut } from 'lucide-react';
-import { useState } from 'react';
+import { Bell, LogOut, Sun, Moon } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { getStoredTheme, setStoredTheme, applyTheme } from '../lib/theme';
 
 export default function Header({ role, pageTitle, onLogout }) {
   const [showNotif, setShowNotif] = useState(false);
+  const [theme, setTheme] = useState(getStoredTheme());
+  const [notifs, setNotifs] = useState([]);
+
+  useEffect(() => { applyTheme(theme); }, [theme]);
+
+  useEffect(() => {
+    if (!showNotif) return;
+    supabase.from('circulars').select('title, created_at').order('created_at', { ascending: false }).limit(5)
+      .then(({ data }) => setNotifs(data || []));
+  }, [showNotif]);
+
+  const toggleTheme = () => {
+    setTheme(prev => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      setStoredTheme(next);
+      return next;
+    });
+  };
 
   return (
     <header className="sticky top-0 z-30 bg-surface-900/80 backdrop-blur-xl border-b border-surface-700/50">
@@ -13,6 +32,12 @@ export default function Header({ role, pageTitle, onLogout }) {
         </div>
 
         <div className="flex items-center gap-3">
+          <button onClick={toggleTheme}
+            className="p-2 rounded-xl hover:bg-surface-700/50 text-surface-400 hover:text-white transition-colors"
+            title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
+            {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </button>
+
           <div className="relative">
             <button
               onClick={() => setShowNotif(!showNotif)}
@@ -30,14 +55,12 @@ export default function Header({ role, pageTitle, onLogout }) {
                     <h3 className="font-semibold text-white text-sm">Notifications</h3>
                   </div>
                   <div className="max-h-72 overflow-y-auto">
-                    {[
-                      { text: 'Mid-sem exam schedule is out!', time: '2h ago' },
-                      { text: 'Fee payment reminder: Due Aug 15', time: '1d ago' },
-                      { text: 'TechFest registration confirmed', time: '3d ago' },
-                    ].map((n, i) => (
+                    {notifs.length === 0 ? (
+                      <div className="px-4 py-6 text-center text-sm text-surface-500">No new notifications</div>
+                    ) : notifs.map((n, i) => (
                       <div key={i} className="px-4 py-3 hover:bg-surface-700/30 transition-colors border-b border-surface-700/20 last:border-0">
-                        <p className="text-sm text-surface-200">{n.text}</p>
-                        <p className="text-xs text-surface-500 mt-1">{n.time}</p>
+                        <p className="text-sm text-surface-200">{n.title}</p>
+                        <p className="text-xs text-surface-500 mt-1">{n.created_at ? new Date(n.created_at).toLocaleDateString() : ''}</p>
                       </div>
                     ))}
                   </div>

@@ -7,6 +7,7 @@ import Header from './components/Header';
 import StudentDashboard from './components/Dashboard/StudentDashboard';
 import FacultyDashboard from './components/Dashboard/FacultyDashboard';
 import AttendanceTracker from './components/Attendance/AttendanceTracker';
+import FacultyAttendance from './components/Attendance/FacultyAttendance';
 import Timetable from './components/Timetable/Timetable';
 import FeeStatus from './components/Fee/FeeStatus';
 import HostelManagement from './components/Hostel/HostelManagement';
@@ -81,9 +82,11 @@ export default function App() {
           ? <StudentDashboard user={user} onNavigate={setActiveSection} />
           : <FacultyDashboard user={user} onNavigate={setActiveSection} />;
       case 'attendance':
-        return <AttendanceTracker user={user} />;
+        return role === 'faculty'
+          ? <FacultyAttendance user={user} />
+          : <AttendanceTracker user={user} />;
       case 'timetable':
-        return <Timetable user={user} />;
+        return <Timetable user={user} role={role} />;
       case 'fees':
         return <FeeStatus user={user} />;
       case 'hostel':

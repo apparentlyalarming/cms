@@ -1,20 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Mail, Lock, Eye, EyeOff, User, GraduationCap, BookOpen,
-  AlertCircle, Loader2, ArrowRight, Hash, Building2, ChevronDown,
+  AlertCircle, Loader2, ArrowRight, Hash, Building2, ChevronDown, Sun, Moon,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { getStoredTheme, setStoredTheme, applyTheme } from '../../lib/theme';
 
-const departments = [
-  'Computer Science',
-  'Electronics & Communication',
-  'Mechanical Engineering',
-  'Civil Engineering',
-  'Electrical Engineering',
-  'Information Technology',
-  'Chemical Engineering',
-  'Biotechnology',
-];
+const DEPARTMENTS = ['CSE', 'Cybersecurity', 'AIML', 'Electronics and Communication', 'Mech'];
 
 export default function Signup({ onSignup, onSwitchToLogin }) {
   const [fullName, setFullName] = useState('');
@@ -25,8 +17,16 @@ export default function Signup({ onSignup, onSwitchToLogin }) {
   const [department, setDepartment] = useState('');
   const [rollNumber, setRollNumber] = useState('');
   const [employeeId, setEmployeeId] = useState('');
+  const [semester, setSemester] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [theme, setTheme] = useState(getStoredTheme());
+
+  useEffect(() => { applyTheme(theme); }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => { const next = prev === 'dark' ? 'light' : 'dark'; setStoredTheme(next); return next; });
+  };
 
   const canSubmit = fullName && email && password && department && (role === 'faculty' ? employeeId : rollNumber);
 
@@ -61,7 +61,7 @@ export default function Signup({ onSignup, onSwitchToLogin }) {
             student_id: userId,
             roll_number: rollNumber,
             department,
-            semester: 1,
+            semester,
           });
 
         if (studentError) throw studentError;
@@ -100,6 +100,9 @@ export default function Signup({ onSignup, onSwitchToLogin }) {
       </div>
 
       <div className="w-full max-w-md relative z-10 animate-fade-in">
+        <button onClick={toggleTheme} className="absolute -top-2 -right-2 p-2 rounded-xl hover:bg-surface-700/50 text-surface-400 hover:text-white transition-colors">
+          {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+        </button>
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-accent to-purple-500 shadow-xl shadow-accent/20 mb-4">
             <GraduationCap className="w-8 h-8 text-white" />
@@ -214,7 +217,7 @@ export default function Signup({ onSignup, onSwitchToLogin }) {
                   required
                 >
                   <option value="" disabled>Select department</option>
-                  {departments.map((d) => (
+                  {DEPARTMENTS.map((d) => (
                     <option key={d} value={d}>{d}</option>
                   ))}
                 </select>
@@ -223,18 +226,36 @@ export default function Signup({ onSignup, onSwitchToLogin }) {
             </div>
 
             {role === 'student' && (
-              <div className="animate-slide-up">
-                <label className="block text-sm font-medium text-surface-300 mb-1.5">Roll Number</label>
-                <div className="relative">
-                  <Hash className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-500" />
-                  <input
-                    type="text"
-                    value={rollNumber}
-                    onChange={(e) => setRollNumber(e.target.value)}
-                    className="input-field pl-11"
-                    placeholder="CS2026-001"
-                    required={role === 'student'}
-                  />
+              <div className="animate-slide-up space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-surface-300 mb-1.5">Roll Number</label>
+                  <div className="relative">
+                    <Hash className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-500" />
+                    <input
+                      type="text"
+                      value={rollNumber}
+                      onChange={(e) => setRollNumber(e.target.value)}
+                      className="input-field pl-11"
+                      placeholder="CSE2026-001"
+                      required={role === 'student'}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-surface-300 mb-1.5">Semester</label>
+                  <div className="relative">
+                    <select
+                      value={semester}
+                      onChange={(e) => setSemester(Number(e.target.value))}
+                      className="input-field pl-11 pr-10 appearance-none"
+                      required
+                    >
+                      {Array.from({ length: 8 }, (_, i) => (
+                        <option key={i + 1} value={i + 1}>Semester {i + 1}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-500 pointer-events-none" />
+                  </div>
                 </div>
               </div>
             )}

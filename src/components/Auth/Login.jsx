@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { Mail, Lock, Eye, EyeOff, LogIn, AlertCircle, GraduationCap, Loader2, ArrowRight } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Mail, Lock, Eye, EyeOff, LogIn, AlertCircle, GraduationCap, Loader2, ArrowRight, UserPlus, ChevronDown, ChevronUp, Sun, Moon } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { getStoredTheme, setStoredTheme, applyTheme } from '../../lib/theme';
 import ForgotPasswordModal from './ForgotPasswordModal';
 
 export default function Login({ onLogin, onSwitchToSignup }) {
@@ -10,6 +11,19 @@ export default function Login({ onLogin, onSwitchToSignup }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showForgot, setShowForgot] = useState(false);
+  const [theme, setTheme] = useState(getStoredTheme());
+  const [showActivate, setShowActivate] = useState(false);
+
+  useEffect(() => { applyTheme(theme); }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => { const next = prev === 'dark' ? 'light' : 'dark'; setStoredTheme(next); return next; });
+  };
+  const [activateName, setActivateName] = useState('');
+  const [activateEmail, setActivateEmail] = useState('');
+  const [activatePwd, setActivatePwd] = useState('');
+  const [activating, setActivating] = useState(false);
+  const [activateMsg, setActivateMsg] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -52,6 +66,28 @@ export default function Login({ onLogin, onSwitchToSignup }) {
     }
   };
 
+  const handleActivate = async (e) => {
+    e.preventDefault();
+    setActivateMsg('');
+    setActivating(true);
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: activateEmail,
+        password: activatePwd,
+        options: { data: { full_name: activateName, role: 'student' } },
+      });
+
+      if (error) throw error;
+      setActivateMsg(data?.user
+        ? 'Account activated! You can now sign in.'
+        : 'Check your email to confirm before signing in.');
+    } catch (err) {
+      setActivateMsg(err.message);
+    } finally {
+      setActivating(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-surface-950 flex items-center justify-center p-4 relative overflow-hidden">
       <div className="absolute inset-0 overflow-hidden">
@@ -61,6 +97,9 @@ export default function Login({ onLogin, onSwitchToSignup }) {
       </div>
 
       <div className="w-full max-w-md relative z-10 animate-fade-in">
+        <button onClick={toggleTheme} className="absolute -top-2 -right-2 p-2 rounded-xl hover:bg-surface-700/50 text-surface-400 hover:text-white transition-colors">
+          {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+        </button>
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-accent to-purple-500 shadow-xl shadow-accent/20 mb-4">
             <GraduationCap className="w-8 h-8 text-white" />
@@ -157,21 +196,50 @@ export default function Login({ onLogin, onSwitchToSignup }) {
             <div className="mt-3 grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => { setEmail('arjun@student.campus.edu'); setPassword('student123'); }}
+                onClick={() => { setEmail('albinsunny@gmail.com'); setPassword('@student123'); }}
                 className="p-2.5 rounded-xl bg-surface-700/30 hover:bg-surface-700/50 border border-surface-700/30 transition-all text-center group"
               >
                 <p className="text-xs font-medium text-surface-300 group-hover:text-white">Student</p>
-                <p className="text-[10px] text-surface-500 mt-0.5">arjun@student.campus.edu</p>
+                <p className="text-[10px] text-surface-500 mt-0.5">albinsunny@gmail.com</p>
               </button>
               <button
                 type="button"
-                onClick={() => { setEmail('priya@faculty.campus.edu'); setPassword('faculty123'); }}
+                onClick={() => { setEmail('apparentlyalarming@gmail.com'); setPassword('@faculty123'); }}
                 className="p-2.5 rounded-xl bg-surface-700/30 hover:bg-surface-700/50 border border-surface-700/30 transition-all text-center group"
               >
                 <p className="text-xs font-medium text-surface-300 group-hover:text-white">Faculty</p>
-                <p className="text-[10px] text-surface-500 mt-0.5">priya@faculty.campus.edu</p>
+                <p className="text-[10px] text-surface-500 mt-0.5">apparentlyalarming@gmail.com</p>
               </button>
             </div>
+          </div>
+
+          <div className="mt-4">
+            <button type="button" onClick={() => setShowActivate(!showActivate)}
+              className="w-full flex items-center justify-center gap-2 text-xs text-surface-500 hover:text-surface-300 transition-colors py-2">
+              <UserPlus className="w-3.5 h-3.5" />
+              First time signing in? Activate your account
+              {showActivate ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            </button>
+            {showActivate && (
+              <form onSubmit={handleActivate} className="mt-3 p-4 rounded-xl bg-surface-700/30 border border-surface-700/30 space-y-3">
+                <p className="text-xs text-surface-400">Enter your pre-assigned email to activate your account.</p>
+                {activateMsg && (
+                  <p className={`text-xs ${activateMsg.includes('Error') || activateMsg.includes('error') ? 'text-danger' : 'text-success'} font-medium`}>
+                    {activateMsg}
+                  </p>
+                )}
+                <input type="text" value={activateName} onChange={e => setActivateName(e.target.value)}
+                  className="input-field py-2 px-3 text-sm" placeholder="Full Name" required />
+                <input type="email" value={activateEmail} onChange={e => setActivateEmail(e.target.value)}
+                  className="input-field py-2 px-3 text-sm" placeholder="Pre-assigned email" required />
+                <input type="password" value={activatePwd} onChange={e => setActivatePwd(e.target.value)}
+                  className="input-field py-2 px-3 text-sm" placeholder="Set a password" required minLength={6} />
+                <button type="submit" disabled={activating || !activateName || !activateEmail || !activatePwd}
+                  className="w-full py-2 rounded-xl bg-accent hover:bg-accent-dark text-white text-sm font-medium transition-colors disabled:opacity-50">
+                  {activating ? 'Activating...' : 'Activate Account'}
+                </button>
+              </form>
+            )}
           </div>
         </div>
 
