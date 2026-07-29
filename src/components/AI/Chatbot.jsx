@@ -1,64 +1,69 @@
 import { useState, useRef, useEffect } from 'react';
-import { MessageCircle, Send, X, Sparkles, Bot, User, Minimize2 } from 'lucide-react';
-import { chatbotFAQ } from '../../data';
+import { MessageCircle, Send, X, Sparkles, Bot } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 const quickPrompts = [
-  'When are mid-sem exams?',
+  'When are my exams?',
+  'Show my timetable',
+  "What's my attendance?",
   'How do I pay fees?',
-  "What's the attendance requirement?",
-  'Hostel leave procedure?',
-  'When does placement start?',
-  'Library timings?',
+  'Upcoming campus events',
+  'Latest circulars',
 ];
 
-export default function Chatbot({ isOpen, onToggle }) {
+export default function Chatbot({ isOpen, onToggle, user, role }) {
   const [messages, setMessages] = useState([
     {
       role: 'bot',
-      text: "Hello! I'm CampusAI, your smart campus assistant. Ask me anything about fees, schedules, policies, or use the quick prompts below.",
+      text: "Hello! I'm CampusAI, your smart campus assistant. Ask me anything about your exams, timetable, attendance, fees, or campus events.",
     },
   ]);
   const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
+  const [studentInfo, setStudentInfo] = useState(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const findAnswer = (question) => {
-    const q = question.toLowerCase();
-    for (const faq of chatbotFAQ) {
-      if (q.includes(faq.q.toLowerCase().slice(0, 10))) {
-        return faq.a;
-      }
-    }
-    const keywords = {
-      fee: 'Fees can be paid through the student portal under Fee Status > Pay Now, or via the college banking portal. UPI, net banking, and card payments are accepted.',
-      exam: 'Mid-semester exams begin on August 12, 2026. Check the exam schedule circular for your individual timetable.',
-      attend: 'A minimum of 75% attendance is required in each subject to be eligible for end-semester examinations.',
-      hostel: 'Submit a leave/pass request through the Hostel Management section. Night outs require warden approval 24 hours in advance.',
-      place: 'Placement season begins in August for final-year students. TCS is the first company visiting on August 25, 2026.',
-      library: 'The library is open 8:00 AM - 8:00 PM on regular days, and extended to midnight during exam periods (Aug 10 - Aug 25).',
-      password: "Click 'Forgot Password' on the login page and use your registered email. If issues persist, contact IT support at helpdesk@campus.edu.",
-      mess: 'The updated mess menu is available in the Circulars section. New continental options on weekends and a Jain food counter have been added.',
-    };
-    for (const [key, answer] of Object.entries(keywords)) {
-      if (q.includes(key)) return answer;
-    }
-    return "I'm not sure about that. Try asking about fees, exams, attendance, hostel, placements, library, or portal access. You can also check the Circulars section for official announcements.";
-  };
+  useEffect(() => {
+    if (role !== 'student' || !user) return;
+    supabase.from('students').select('department, semester').eq('student_id', user.id).single()
+      .then(({ data }) => setStudentInfo(data));
+  }, [user, role]);
 
-  const sendMessage = (text) => {
+  const sendToAI = async (text) => {
     const question = text || input;
-    if (!question.trim()) return;
+    if (!question.trim() || loading) return;
 
     setMessages(prev => [...prev, { role: 'user', text: question }]);
     setInput('');
+    setLoading(true);
 
-    setTimeout(() => {
-      const answer = findAnswer(question);
-      setMessages(prev => [...prev, { role: 'bot', text: answer }]);
-    }, 500 + Math.random() * 500);
+    try {
+      const context = {
+        role: role || 'student',
+        userId: user?.id,
+        department: studentInfo?.department,
+        semester: studentInfo?.semester,
+      };
+
+      const res = await fetch('http://localhost:3001/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: question, context }),
+      });
+
+      if (!res.ok) throw new Error('Server error');
+
+      const { reply } = await res.json();
+      setMessages(prev => [...prev, { role: 'bot', text: reply }]);
+    } catch (err) {
+      setMessages(prev => [...prev, { role: 'bot', text: 'Sorry, I had trouble connecting. The AI server might not be running.' }]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -113,6 +118,17 @@ export default function Chatbot({ isOpen, onToggle }) {
                 </div>
               </div>
             ))}
+            {loading && (
+              <div className="flex justify-start animate-fade-in">
+                <div className="bg-surface-800 text-surface-400 rounded-2xl rounded-bl-md border border-surface-700/30 px-4 py-2.5">
+                  <div className="flex gap-1">
+                    <span className="w-2 h-2 bg-surface-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-2 h-2 bg-surface-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-2 h-2 bg-surface-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </div>
+                </div>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
 
@@ -121,7 +137,7 @@ export default function Chatbot({ isOpen, onToggle }) {
               {quickPrompts.map((p, i) => (
                 <button
                   key={i}
-                  onClick={() => sendMessage(p)}
+                  onClick={() => sendToAI(p)}
                   className="px-3 py-1.5 rounded-full bg-surface-800/60 border border-surface-700/30 text-xs text-surface-400 hover:text-white hover:border-accent/30 whitespace-nowrap transition-all"
                 >
                   {p}
@@ -136,13 +152,13 @@ export default function Chatbot({ isOpen, onToggle }) {
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+                onKeyDown={(e) => e.key === 'Enter' && sendToAI()}
                 placeholder="Ask about campus..."
                 className="input-field text-sm"
               />
               <button
-                onClick={() => sendMessage()}
-                disabled={!input.trim()}
+                onClick={() => sendToAI()}
+                disabled={!input.trim() || loading}
                 className="p-2.5 rounded-xl bg-accent hover:bg-accent-dark text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all"
               >
                 <Send className="w-4 h-4" />

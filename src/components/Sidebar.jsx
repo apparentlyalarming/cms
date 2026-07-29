@@ -2,14 +2,15 @@ import { useState, useEffect } from 'react';
 import {
   LayoutDashboard, GraduationCap, BookOpen, Calendar, CreditCard,
   Building2, CalendarDays, Megaphone, Brain, MessageCircle,
-  ChevronLeft, ChevronRight, Sparkles,
+  ChevronLeft, ChevronRight, Sparkles, ScrollText, Shield,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 const navItems = [
   { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { id: 'attendance', icon: BookOpen, label: 'Attendance' },
-  { id: 'timetable', icon: Calendar, label: 'Timetable' },
+  { id: 'timetable', icon: Calendar, label: 'Class Timetable' },
+  { id: 'exam-timetable', icon: ScrollText, label: 'Exam Timetable' },
   { id: 'fees', icon: CreditCard, label: 'Fee Status' },
   { id: 'hostel', icon: Building2, label: 'Hostel' },
   { id: 'events', icon: CalendarDays, label: 'Events' },
@@ -19,16 +20,28 @@ const navItems = [
 
 export default function Sidebar({ activeSection, onNavigate, role, user, collapsed, onToggleCollapse, onChatToggle }) {
   const [profile, setProfile] = useState(null);
+  const [designation, setDesignation] = useState(null);
 
   useEffect(() => {
     if (!user) return;
     supabase.from('profiles').select('full_name, email').eq('id', user.id).single()
       .then(({ data }) => setProfile(data));
-  }, [user]);
+    if (role === 'faculty') {
+      supabase.from('faculty').select('designation').eq('faculty_id', user.id).single()
+        .then(({ data }) => { if (data) setDesignation(data.designation); });
+    }
+  }, [user, role]);
 
+  const isAccountant = designation === 'Accountant';
+  const isAdmin = designation === 'Admin';
   const displayName = profile?.full_name || profile?.email?.split('@')[0] || 'User';
   const initials = displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
-  const displayId = role === 'student' ? '' : '';
+
+  const visibleItems = isAccountant
+    ? navItems.filter(i => ['dashboard', 'fees', 'circulars'].includes(i.id))
+    : isAdmin
+      ? [...navItems.filter(i => i.id !== 'performance'), { id: 'admin', icon: Shield, label: 'Admin Panel' }]
+      : navItems;
 
   return (
     <aside
@@ -54,7 +67,7 @@ export default function Sidebar({ activeSection, onNavigate, role, user, collaps
       </div>
 
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-        {navItems.map((item) => {
+        {visibleItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeSection === item.id;
           return (
@@ -100,7 +113,7 @@ export default function Sidebar({ activeSection, onNavigate, role, user, collaps
           {!collapsed && (
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-white truncate">{displayName}</p>
-              <p className="text-xs text-surface-500 capitalize">{role}</p>
+              <p className="text-xs text-surface-500 capitalize">{isAdmin ? 'Admin' : isAccountant ? 'Accountant' : role}</p>
             </div>
           )}
         </div>

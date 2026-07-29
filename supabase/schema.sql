@@ -84,23 +84,37 @@ CREATE TABLE IF NOT EXISTS timetable (
   slot_type    TEXT NOT NULL DEFAULT 'lecture' CHECK (slot_type IN ('lecture','lab','tutorial'))
 );
 
--- 2h. fees
+-- 2h. exams — exam schedule with venue
+CREATE TABLE IF NOT EXISTS exams (
+  exam_id      UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  department   department_type NOT NULL DEFAULT 'CSE',
+  semester     INT NOT NULL CHECK (semester BETWEEN 1 AND 8),
+  subject_name TEXT NOT NULL,
+  exam_date    DATE NOT NULL,
+  start_time   TIME NOT NULL,
+  end_time     TIME NOT NULL,
+  venue        TEXT NOT NULL,
+  exam_type    TEXT NOT NULL DEFAULT 'endsem' CHECK (exam_type IN ('midsem','endsem','quiz','lab_test')),
+  created_at   TIMESTAMPTZ DEFAULT now()
+);
 
--- 2i. fee_payments — payment history ledger
+-- 2i. fees
 
--- 2j. hostel_rooms
+-- 2j. fee_payments — payment history ledger
 
--- 2k. hostel_assignments
+-- 2k. hostel_rooms
 
--- 2l. hostel_pass_requests
+-- 2l. hostel_assignments
 
--- 2m. events
+-- 2m. hostel_pass_requests
 
--- 2n. event_registrations
+-- 2n. events
 
--- 2o. circulars — official notices / notice board
+-- 2o. event_registrations
 
--- 2p. performance — quiz / assignment / exam scores per enrollment
+-- 2p. circulars — official notices / notice board
+
+-- 2q. performance — quiz / assignment / exam scores per enrollment
 CREATE TABLE IF NOT EXISTS performance (
   performance_id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   enrollment_id  UUID NOT NULL REFERENCES enrollments(enrollment_id) ON DELETE CASCADE,
@@ -123,6 +137,7 @@ ALTER TABLE courses               ENABLE ROW LEVEL SECURITY;
 ALTER TABLE enrollments           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE attendance            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE timetable             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE exams                 ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fees                  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fee_payments          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE hostel_rooms          ENABLE ROW LEVEL SECURITY;
@@ -222,72 +237,31 @@ CREATE POLICY "Faculty can manage timetable"
   ON timetable FOR ALL
   USING (public.current_user_role() = 'faculty');
 
--- 4h. fees
-CREATE POLICY "Students can read own fees"
-  ON fees FOR SELECT
-  USING (auth.uid() = student_id OR public.current_user_role() = 'faculty');
+-- 4h. exams — public read, faculty write
+CREATE POLICY "Anyone can read exams"
+  ON exams FOR SELECT USING (true);
 
-CREATE POLICY "Faculty can manage fees"
-  ON fees FOR ALL
+CREATE POLICY "Faculty can manage exams"
+  ON exams FOR ALL
   USING (public.current_user_role() = 'faculty');
 
--- 4i. fee_payments
-CREATE POLICY "Students can read own payments"
-  ON fee_payments FOR SELECT
-  USING (auth.uid() = student_id OR public.current_user_role() = 'faculty');
+-- 4i. fees
 
-CREATE POLICY "Faculty can manage payments"
-  ON fee_payments FOR ALL
-  USING (public.current_user_role() = 'faculty');
+-- 4j. fee_payments
 
--- 4j. hostel_rooms — public read
-CREATE POLICY "Anyone can read hostel rooms"
-  ON hostel_rooms FOR SELECT USING (true);
+-- 4k. hostel_rooms — public read
 
--- 4k. hostel_assignments
-CREATE POLICY "Students can read own assignment"
-  ON hostel_assignments FOR SELECT
-  USING (auth.uid() = student_id OR public.current_user_role() = 'faculty');
+-- 4l. hostel_assignments
 
--- 4l. hostel_pass_requests
-CREATE POLICY "Students can read own pass requests"
-  ON hostel_pass_requests FOR SELECT USING (auth.uid() = student_id);
+-- 4m. hostel_pass_requests
 
-CREATE POLICY "Students can insert own pass requests"
-  ON hostel_pass_requests FOR INSERT WITH CHECK (auth.uid() = student_id);
+-- 4n. events — public read
 
-CREATE POLICY "Faculty can read and manage all pass requests"
-  ON hostel_pass_requests FOR ALL
-  USING (public.current_user_role() = 'faculty');
+-- 4o. event_registrations
 
--- 4m. events — public read
-CREATE POLICY "Anyone can read events"
-  ON events FOR SELECT USING (true);
+-- 4p. circulars — public read, faculty write
 
-CREATE POLICY "Faculty can manage events"
-  ON events FOR ALL
-  USING (public.current_user_role() = 'faculty');
-
--- 4n. event_registrations
-CREATE POLICY "Students can read own registrations"
-  ON event_registrations FOR SELECT
-  USING (auth.uid() = student_id OR public.current_user_role() = 'faculty');
-
-CREATE POLICY "Students can register for events"
-  ON event_registrations FOR INSERT WITH CHECK (auth.uid() = student_id);
-
-CREATE POLICY "Students can unregister from events"
-  ON event_registrations FOR DELETE USING (auth.uid() = student_id);
-
--- 4o. circulars — public read, faculty write
-CREATE POLICY "Anyone can read circulars"
-  ON circulars FOR SELECT USING (true);
-
-CREATE POLICY "Faculty can manage circulars"
-  ON circulars FOR ALL
-  USING (public.current_user_role() = 'faculty');
-
--- 4p. performance
+-- 4q. performance
 CREATE POLICY "Students can read own performance"
   ON performance FOR SELECT
   USING (EXISTS (

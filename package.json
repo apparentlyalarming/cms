@@ -5,12 +5,16 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:ai": "node ai-server.mjs & vite",
     "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.109.0",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
     "lucide-react": "^0.300.0",
+    "openai": "^7.1.0",
     "pg": "^8.22.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"

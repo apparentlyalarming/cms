@@ -199,7 +199,7 @@ export default function Login({ onLogin, onSwitchToSignup }) {
                 onClick={() => { setEmail('albinsunny@gmail.com'); setPassword('@student123'); }}
                 className="p-2.5 rounded-xl bg-surface-700/30 hover:bg-surface-700/50 border border-surface-700/30 transition-all text-center group"
               >
-                <p className="text-xs font-medium text-surface-300 group-hover:text-white">Student</p>
+                <p className="text-xs font-medium text-surface-300 group-hover:text-white">🎓 Student</p>
                 <p className="text-[10px] text-surface-500 mt-0.5">albinsunny@gmail.com</p>
               </button>
               <button
@@ -207,8 +207,24 @@ export default function Login({ onLogin, onSwitchToSignup }) {
                 onClick={() => { setEmail('apparentlyalarming@gmail.com'); setPassword('@faculty123'); }}
                 className="p-2.5 rounded-xl bg-surface-700/30 hover:bg-surface-700/50 border border-surface-700/30 transition-all text-center group"
               >
-                <p className="text-xs font-medium text-surface-300 group-hover:text-white">Faculty</p>
+                <p className="text-xs font-medium text-surface-300 group-hover:text-white">⚙️ Admin</p>
                 <p className="text-[10px] text-surface-500 mt-0.5">apparentlyalarming@gmail.com</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setEmail('warden@mgmcet.com'); setPassword('@warden123'); }}
+                className="p-2.5 rounded-xl bg-surface-700/30 hover:bg-surface-700/50 border border-surface-700/30 transition-all text-center group"
+              >
+                <p className="text-xs font-medium text-surface-300 group-hover:text-white">🏠 Warden</p>
+                <p className="text-[10px] text-surface-500 mt-0.5">warden@mgmcet.com</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setEmail('accounts@mgmcet.com'); setPassword('@accounts123'); }}
+                className="p-2.5 rounded-xl bg-surface-700/30 hover:bg-surface-700/50 border border-surface-700/30 transition-all text-center group"
+              >
+                <p className="text-xs font-medium text-surface-300 group-hover:text-white">💰 Accountant</p>
+                <p className="text-[10px] text-surface-500 mt-0.5">accounts@mgmcet.com</p>
               </button>
             </div>
           </div>

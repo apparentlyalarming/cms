@@ -82,7 +82,7 @@ export default function FacultyDashboard({ user, onNavigate }) {
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
-        <h2 className="text-2xl font-bold text-white">Good morning, {name} 🎓</h2>
+        <h2 className="text-2xl font-bold text-white">{new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening'}, {name} 🎓</h2>
         <p className="text-surface-400 mt-1">
           {facultyRec?.designation || 'Faculty'} • {facultyRec?.department || profile?.email} • ID: {facultyRec?.employee_id || '—'}
         </p>

@@ -9,22 +9,26 @@ import FacultyDashboard from './components/Dashboard/FacultyDashboard';
 import AttendanceTracker from './components/Attendance/AttendanceTracker';
 import FacultyAttendance from './components/Attendance/FacultyAttendance';
 import Timetable from './components/Timetable/Timetable';
+import ExamTimetable from './components/Timetable/ExamTimetable';
 import FeeStatus from './components/Fee/FeeStatus';
 import HostelManagement from './components/Hostel/HostelManagement';
 import EventRegistration from './components/Events/EventRegistration';
 import Circulars from './components/Circulars/Circulars';
 import PerformancePredictor from './components/AI/PerformancePredictor';
+import AdminPanel from './components/Admin/AdminPanel';
 import Chatbot from './components/AI/Chatbot';
 
 const sectionTitles = {
   dashboard: 'Dashboard',
   attendance: 'Attendance',
-  timetable: 'Timetable',
+  timetable: 'Class Timetable',
+  'exam-timetable': 'Exam Timetable',
   fees: 'Fee Status',
   hostel: 'Hostel Management',
   events: 'Campus Events',
   circulars: 'Notice Board',
   performance: 'AI Performance Predictor',
+  admin: 'Admin Panel',
 };
 
 export default function App() {
@@ -87,16 +91,20 @@ export default function App() {
           : <AttendanceTracker user={user} />;
       case 'timetable':
         return <Timetable user={user} role={role} />;
+      case 'exam-timetable':
+        return <ExamTimetable user={user} role={role} />;
       case 'fees':
-        return <FeeStatus user={user} />;
+        return <FeeStatus user={user} role={role} />;
       case 'hostel':
-        return <HostelManagement user={user} />;
+        return <HostelManagement user={user} role={role} />;
       case 'events':
-        return <EventRegistration user={user} />;
+        return <EventRegistration user={user} role={role} />;
       case 'circulars':
-        return <Circulars />;
+        return <Circulars user={user} role={role} />;
       case 'performance':
-        return <PerformancePredictor user={user} />;
+        return <PerformancePredictor user={user} role={role} />;
+      case 'admin':
+        return <AdminPanel user={user} role={role} />;
       default:
         return <StudentDashboard user={user} onNavigate={setActiveSection} />;
     }
@@ -128,7 +136,7 @@ export default function App() {
         </main>
       </div>
 
-      <Chatbot isOpen={chatOpen} onToggle={() => setChatOpen(!chatOpen)} />
+      <Chatbot isOpen={chatOpen} onToggle={() => setChatOpen(!chatOpen)} user={user} role={role} />
     </div>
   );
 }
